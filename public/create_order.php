@@ -10,10 +10,10 @@ $pdo = Database::connect();
 
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $productionNumber = $_POST['ProductionNumber'] ?? '';
-    $emptyTube = $_POST['EmptyTubeNumber'] ?? '';
-    $projectID = $_POST['ProjectID'] ?? null;
-    $modelID = $_POST['ModelID'] ?? null;
+$productionNumber = Database::sanitizeString($_POST['ProductionNumber'] ?? '');
+$emptyTube = Database::sanitizeString($_POST['EmptyTubeNumber'] ?? '');
+$projectID = $_POST['ProjectID'] !== '' ? (int)$_POST['ProjectID'] : null;
+$modelID = $_POST['ModelID'] !== '' ? (int)$_POST['ModelID'] : null;
 
     if (!$productionNumber) {
         $error = 'Production Number is required';
@@ -33,8 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($_POST['liner'])) {
             $luStmt = $pdo->prepare('INSERT INTO MC02_LinerUsage (ProductionNumber, LinerType, LinerBatchNumber, Remarks) VALUES (?, ?, ?, ?)');
             foreach ($_POST['liner'] as $liner) {
-                if (!$liner['LinerType']) continue;
-                $luStmt->execute([$productionNumber, $liner['LinerType'], $liner['LinerBatchNumber'], $liner['Remarks']]);
+                $linerType = Database::sanitizeString($liner['LinerType'] ?? '');
+                if (!$linerType) {
+                    continue;
+                }
+                $batch = Database::sanitizeString($liner['LinerBatchNumber'] ?? '');
+                $remarks = Database::sanitizeString($liner['Remarks'] ?? '');
+                $luStmt->execute([$productionNumber, $linerType, $batch, $remarks]);
             }
         }
 
@@ -43,14 +48,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($_POST['log'] as $log) {
                 $logStmt->execute([
                     $productionNumber,
-                    $log['SequenceNo'],
-                    $log['ProcessStepName'],
+                    (int)($log['SequenceNo'] ?? 0),
+                    Database::sanitizeString($log['ProcessStepName'] ?? ''),
                     $log['DatePerformed'] ?: null,
-                    $log['Result'] ?: null,
-                    $log['Operator_UserID'] ?: null,
-                    $log['Remarks'] ?: null,
-                    $log['ControlValue'] ?: null,
-                    $log['ActualMeasuredValue'] ?: null,
+                    Database::sanitizeString($log['Result'] ?? ''),
+                    $log['Operator_UserID'] !== '' ? (int)$log['Operator_UserID'] : null,
+                    Database::sanitizeString($log['Remarks'] ?? ''),
+                    $log['ControlValue'] !== '' ? $log['ControlValue'] : null,
+                    $log['ActualMeasuredValue'] !== '' ? $log['ActualMeasuredValue'] : null,
                 ]);
             }
         }
