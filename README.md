@@ -99,7 +99,10 @@ rocket-production-management/
 ├── 📁 src/                    # Core business logic
 │   └── Database.php
 ├── 📁 public/                 # Web accessible files
-│   ├── 📁 pages/              # Application pages
+│   ├── manage_projects.php    # Projects interface
+│   ├── create_project.php     # Create project page
+│   ├── edit_project.php       # Edit project page
+│   ├── models.php             # AJAX models list
 │   ├── 📁 api/                # API endpoints
 │   ├── 📁 assets/             # CSS, JS, Images
 │   └── 📁 templates/          # Reusable templates

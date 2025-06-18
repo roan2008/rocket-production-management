@@ -7,7 +7,7 @@
 
 ### ✅ **Week 1-2: Core Features Enhancement (COMPLETED)**
 - [x] **AJAX และ Loading States** - เพิ่มการทำงานแบบ asynchronous และแสดงสถานะการโหลด
-- [x] **Form Validation** - ปรับปรุงการตัวจตรวจสอบข้อมูลทั้ง client-side และ server-side
+- [x] **Form Validation** - ปรับปรุงการตรวจสอบข้อมูลทั้ง client-side และ server-side
 - [x] **Error Handling** - จัดการข้อผิดพลาดให้ดีขึ้น พร้อม Toast notifications
 - [x] **Process Log Enhancement** - ปรับปรุงการจัดการ Process Log ให้ dynamic (เพิ่ม/ลบได้)
 - [x] **Input Sanitization** - เพิ่มความปลอดภัยในการรับข้อมูลจากผู้ใช้

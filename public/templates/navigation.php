@@ -9,6 +9,9 @@
         <li class="nav-item">
           <a class="nav-link" href="create_order.php">Create Order</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="manage_projects.php">Projects</a>
+        </li>
       </ul>
       <div class="d-flex">
         <?php if (isset($_SESSION['UserID'])): ?>
