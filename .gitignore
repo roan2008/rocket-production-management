@@ -1,0 +1,119 @@
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# PHP Files
+*.log
+*.tmp
+*.temp
+
+# Configuration Files (keep templates, ignore actual config)
+config.php
+/config/database.php
+/config/production.php
+
+# Dependency Directories
+vendor/
+node_modules/
+bower_components/
+
+# Composer
+composer.phar
+composer.lock
+
+# Build and Distribution
+build/
+dist/
+.build/
+
+# Cache and Session Files
+/cache/*
+/sessions/*
+/tmp/*
+/logs/*
+*.cache
+
+# Database Files
+*.sql.backup
+*.sql.bak
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup Files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Environment Files
+.env
+.env.local
+.env.production
+.env.staging
+
+# Upload Directories
+/uploads/*
+/files/*
+/public/uploads/*
+
+# Generated Files
+/public/assets/compiled/*
+/public/css/compiled/*
+/public/js/compiled/*
+
+# Documentation Build
+/docs/_build/
+/docs/html/
+/docs/latex/
+
+# Testing
+/phpunit.xml
+/tests/output/
+/coverage/
+
+# Package Files
+*.zip
+*.tar.gz
+*.rar
+
+# Temporary Files
+*.tmp
+*.temp
+temp/
+temporary/
+
+# User-specific Files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Security Files
+*.pem
+*.key
+*.crt
+*.p12
+
+# Ignore everything in config directory except templates
+config/*
+!config/*.template.php
+!config/*.example.php
+
+# Keep important directories but ignore their contents
+logs/.gitkeep
+cache/.gitkeep
+sessions/.gitkeep
+uploads/.gitkeep
