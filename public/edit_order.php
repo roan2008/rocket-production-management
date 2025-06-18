@@ -7,7 +7,7 @@ if (!isset($_SESSION['UserID'])) {
 
 require_once __DIR__ . '/../src/Database.php';
 $pdo = Database::connect();
-$pn = $_GET['pn'] ?? '';
+$pn = Database::sanitizeString($_GET['pn'] ?? '');
 
 // Fetch existing order data
 $stmt = $pdo->prepare('SELECT po.*, p.ProjectName, m.ModelName
@@ -40,10 +40,10 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $emptyTube = $_POST['EmptyTubeNumber'] ?? '';
-    $projectID = $_POST['ProjectID'] ?? null;
-    $modelID = $_POST['ModelID'] ?? null;
-    $status = $_POST['MC02_Status'] ?? '';
+    $emptyTube = Database::sanitizeString($_POST['EmptyTubeNumber'] ?? '');
+    $projectID = $_POST['ProjectID'] !== '' ? (int)$_POST['ProjectID'] : null;
+    $modelID = $_POST['ModelID'] !== '' ? (int)$_POST['ModelID'] : null;
+    $status = Database::sanitizeString($_POST['MC02_Status'] ?? '');
 
     if (!$error) {
         $pdo->beginTransaction();
@@ -57,9 +57,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($_POST['liner'])) {
                 $luStmt = $pdo->prepare('INSERT INTO MC02_LinerUsage (ProductionNumber, LinerType, LinerBatchNumber, Remarks) VALUES (?, ?, ?, ?)');
                 foreach ($_POST['liner'] as $liner) {
-                    if (!empty($liner['LinerType'])) {
-                        $luStmt->execute([$pn, $liner['LinerType'], $liner['LinerBatchNumber'], $liner['Remarks']]);
+                    $linerType = Database::sanitizeString($liner['LinerType'] ?? '');
+                    if ($linerType === '') {
+                        continue;
                     }
+                    $batch = Database::sanitizeString($liner['LinerBatchNumber'] ?? '');
+                    $remarks = Database::sanitizeString($liner['Remarks'] ?? '');
+                    $luStmt->execute([$pn, $linerType, $batch, $remarks]);
                 }
             }
 
@@ -68,17 +72,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($_POST['log'])) {
                 $logStmt = $pdo->prepare('INSERT INTO MC02_ProcessLog (ProductionNumber, SequenceNo, ProcessStepName, DatePerformed, Result, Operator_UserID, Remarks, ControlValue, ActualMeasuredValue) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
                 foreach ($_POST['log'] as $log) {
-                    if (!empty($log['ProcessStepName'])) {
+                    $step = Database::sanitizeString($log['ProcessStepName'] ?? '');
+                    if ($step !== '') {
                         $logStmt->execute([
                             $pn,
-                            $log['SequenceNo'],
-                            $log['ProcessStepName'],
+                            (int)($log['SequenceNo'] ?? 0),
+                            $step,
                             $log['DatePerformed'] ?: null,
-                            $log['Result'],
-                            $log['Operator_UserID'] ?: null,
-                            $log['Remarks'],
-                            $log['ControlValue'] ?: null,
-                            $log['ActualMeasuredValue'] ?: null
+                            Database::sanitizeString($log['Result'] ?? ''),
+                            $log['Operator_UserID'] !== '' ? (int)$log['Operator_UserID'] : null,
+                            Database::sanitizeString($log['Remarks'] ?? ''),
+                            $log['ControlValue'] !== '' ? $log['ControlValue'] : null,
+                            $log['ActualMeasuredValue'] !== '' ? $log['ActualMeasuredValue'] : null
                         ]);
                     }
                 }
@@ -131,7 +136,7 @@ include __DIR__ . '/templates/header.php';
         
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
-        <?php endif; ?>        <form method="post">
+        <?php endif; ?>        <form method="post" id="edit-order-form">
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Basic Information</h5>
@@ -320,9 +325,69 @@ include __DIR__ . '/templates/header.php';
                 <td><button type="button" onclick="removeRow(this)" class="btn btn-outline-danger btn-sm">Remove</button></td>
             `;
             logRowCount++;
-        }        function removeRow(button) {
+        }
+
+        function removeRow(button) {
             const row = button.closest('tr');
             row.remove();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('edit-order-form');
+            if (!form) return;
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const projectId = form.querySelector('[name="ProjectID"]').value;
+                const modelId = form.querySelector('[name="ModelID"]').value;
+                if (!projectId) {
+                    showToast('Please select a Project', 'error');
+                    return;
+                }
+                if (!modelId) {
+                    showToast('Please select a Model', 'error');
+                    return;
+                }
+                showLoading();
+                fetch('api/edit_order.php', {
+                    method: 'POST',
+                    body: new FormData(form)
+                })
+                    .then(r => r.json())
+                    .then(data => {
+                        hideLoading();
+                        if (data.success) {
+                            showToast('Order updated successfully');
+                            refreshLogs(data.logs);
+                        } else {
+                            showToast(data.error || 'Update failed', 'error');
+                        }
+                    })
+                    .catch(() => {
+                        hideLoading();
+                        showToast('Network error', 'error');
+                    });
+            });
+        });
+
+        function refreshLogs(logs) {
+            const tbody = document.getElementById('logTable').getElementsByTagName('tbody')[0];
+            tbody.innerHTML = '';
+            logRowCount = logs.length;
+            logs.forEach((log, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td><input type="number" class="form-control form-control-sm" name="log[${index}][SequenceNo]" value="${log.SequenceNo}" style="width: 70px;"></td>
+                    <td><input type="text" class="form-control form-control-sm" name="log[${index}][ProcessStepName]" value="${log.ProcessStepName}"></td>
+                    <td><input type="date" class="form-control form-control-sm" name="log[${index}][DatePerformed]" value="${log.DatePerformed ?? ''}"></td>
+                    <td><input type="text" class="form-control form-control-sm" name="log[${index}][Result]" value="${log.Result ?? ''}"></td>
+                    <td><input type="number" class="form-control form-control-sm" name="log[${index}][Operator_UserID]" value="${log.Operator_UserID ?? ''}" style="width: 90px;"></td>
+                    <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[${index}][ControlValue]" value="${log.ControlValue ?? ''}" style="width: 100px;"></td>
+                    <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[${index}][ActualMeasuredValue]" value="${log.ActualMeasuredValue ?? ''}" style="width: 100px;"></td>
+                    <td><textarea class="form-control form-control-sm" name="log[${index}][Remarks]" rows="2">${log.Remarks ?? ''}</textarea></td>
+                    <td><button type="button" onclick="removeRow(this)" class="btn btn-outline-danger btn-sm">Remove</button></td>
+                `;
+            });
         }
     </script>
 
