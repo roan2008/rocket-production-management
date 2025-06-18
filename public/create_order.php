@@ -171,53 +171,53 @@ include 'templates/header.php';
                         </table>
                     </div>
                 </div>
-            </div>
-
-            <!-- Process Log Card -->
+            </div>            <!-- Process Log Card -->
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0"><i class="fas fa-clipboard-list me-2"></i>Process Log</h5>
+                    <button type="button" class="btn btn-sm btn-success" onclick="addProcessLogRow()">
+                        <i class="fas fa-plus me-1"></i>Add Process Log
+                    </button>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table id="log-table" class="table table-striped table-hover">                    <div class="table-responsive">
-                        <table id="log-table" class="table table-striped table-hover">
-                            <thead class="table-dark">
+                        <table id="log-table" class="table table-striped table-hover">                            <thead class="table-dark">
                                 <tr>
                                     <th width="5%">Seq</th>
-                                    <th width="25%">Step Name</th>
+                                    <th width="20%">Step Name</th>
                                     <th width="12%">Date</th>
                                     <th width="12%">Result</th>
                                     <th width="15%">Operator</th>
                                     <th width="10%">Control</th>
                                     <th width="10%">Actual</th>
                                     <th width="11%">Remarks</th>
+                                    <th width="5%">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php for ($i = 1; $i <= 16; $i++): ?>
+                                <!-- Default first row -->
                                 <tr>
                                     <td>
-                                        <input type="number" name="log[<?php echo $i; ?>][SequenceNo]" 
-                                               value="<?php echo $i; ?>" readonly class="form-control form-control-sm">
+                                        <input type="number" name="log[0][SequenceNo]" 
+                                               value="1" readonly class="form-control form-control-sm">
                                     </td>
                                     <td>
-                                        <input type="text" name="log[<?php echo $i; ?>][ProcessStepName]" 
-                                               required class="form-control form-control-sm">
+                                        <input type="text" name="log[0][ProcessStepName]" 
+                                               class="form-control form-control-sm" placeholder="Enter process step name">
                                     </td>
                                     <td>
-                                        <input type="date" name="log[<?php echo $i; ?>][DatePerformed]" 
+                                        <input type="date" name="log[0][DatePerformed]" 
                                                class="form-control form-control-sm">
                                     </td>
                                     <td>
-                                        <select name="log[<?php echo $i; ?>][Result]" class="form-select form-select-sm">
+                                        <select name="log[0][Result]" class="form-select form-select-sm">
                                             <option value="">--</option>
                                             <option value="✓ เรียบร้อย">✓ เรียบร้อย</option>
                                             <option value="✗ แก้ไข">✗ แก้ไข</option>
                                         </select>
                                     </td>
                                     <td>
-                                        <select name="log[<?php echo $i; ?>][Operator_UserID]" class="form-select form-select-sm">
+                                        <select name="log[0][Operator_UserID]" class="form-select form-select-sm">
                                             <option value="">--</option>
                                             <?php foreach ($users as $u): ?>
                                                 <option value="<?php echo $u['UserID']; ?>"><?php echo htmlspecialchars($u['FullName']); ?></option>
@@ -225,19 +225,23 @@ include 'templates/header.php';
                                         </select>
                                     </td>
                                     <td>
-                                        <input type="number" step="0.001" name="log[<?php echo $i; ?>][ControlValue]" 
+                                        <input type="number" step="0.001" name="log[0][ControlValue]" 
                                                class="form-control form-control-sm">
                                     </td>
                                     <td>
-                                        <input type="number" step="0.001" name="log[<?php echo $i; ?>][ActualMeasuredValue]" 
+                                        <input type="number" step="0.001" name="log[0][ActualMeasuredValue]" 
                                                class="form-control form-control-sm">
                                     </td>
                                     <td>
-                                        <input type="text" name="log[<?php echo $i; ?>][Remarks]" 
+                                        <input type="text" name="log[0][Remarks]" 
                                                class="form-control form-control-sm">
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProcessLogRow(this)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                     </td>
                                 </tr>
-                                <?php endfor; ?>
                             </tbody>
                         </table>
                     </div>
@@ -321,9 +325,97 @@ function removeLinerRow(button) {
                     input.setAttribute('name', newName);
                 }
             });
+        });    } else {
+        alert('You must have at least one liner row.');
+    }
+}
+
+// Process Log Management Functions
+let processLogRowCount = 1;
+
+function addProcessLogRow() {
+    const table = document.getElementById('log-table').getElementsByTagName('tbody')[0];
+    const rowCount = table.rows.length;
+    const row = table.insertRow();
+    
+    row.innerHTML = `
+        <td>
+            <input type="number" name="log[${rowCount}][SequenceNo]" 
+                   value="${rowCount + 1}" readonly class="form-control form-control-sm">
+        </td>
+        <td>
+            <input type="text" name="log[${rowCount}][ProcessStepName]" 
+                   class="form-control form-control-sm" placeholder="Enter process step name">
+        </td>
+        <td>
+            <input type="date" name="log[${rowCount}][DatePerformed]" 
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <select name="log[${rowCount}][Result]" class="form-select form-select-sm">
+                <option value="">--</option>
+                <option value="✓ เรียบร้อย">✓ เรียบร้อย</option>
+                <option value="✗ แก้ไข">✗ แก้ไข</option>
+            </select>
+        </td>
+        <td>
+            <select name="log[${rowCount}][Operator_UserID]" class="form-select form-select-sm">
+                <option value="">--</option>
+                <?php foreach ($users as $u): ?>
+                <option value="<?php echo $u['UserID']; ?>"><?php echo htmlspecialchars($u['FullName']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </td>
+        <td>
+            <input type="number" step="0.001" name="log[${rowCount}][ControlValue]" 
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <input type="number" step="0.001" name="log[${rowCount}][ActualMeasuredValue]" 
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <input type="text" name="log[${rowCount}][Remarks]" 
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProcessLogRow(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    processLogRowCount++;
+}
+
+function removeProcessLogRow(button) {
+    const row = button.closest('tr');
+    const table = row.closest('tbody');
+    
+    // Don't allow removing the last row
+    if (table.rows.length > 1) {
+        row.remove();
+        
+        // Update sequence numbers and name attributes
+        Array.from(table.rows).forEach((row, index) => {
+            // Update sequence number
+            const seqInput = row.querySelector('input[name*="[SequenceNo]"]');
+            if (seqInput) {
+                seqInput.value = index + 1;
+            }
+            
+            // Update all name attributes to maintain proper indexing
+            const inputs = row.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                const name = input.getAttribute('name');
+                if (name && name.includes('log[')) {
+                    const newName = name.replace(/log\[\d+\]/, `log[${index}]`);
+                    input.setAttribute('name', newName);
+                }
+            });
         });
     } else {
-        alert('You must have at least one liner row.');
+        alert('You must have at least one process log row.');
     }
 }
 
