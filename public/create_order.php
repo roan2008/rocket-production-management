@@ -71,6 +71,64 @@ $page_title = 'Create Order';
 $breadcrumbs = [
     ['title' => 'Create New Order']
 ];
+
+// Phase 1 UX Improvements - Custom CSS for Template Preview
+$custom_css = '
+<style>
+.template-preview {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.process-step-item {
+    background: white;
+    transition: all 0.3s ease;
+    border-left: 4px solid #007bff;
+}
+
+.process-step-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-left-color: #0056b3;
+}
+
+.step-number {
+    min-width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.process-steps-preview {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#edit-template-btn {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(0, 123, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 123, 255, 0); }
+}
+
+.template-preview .bg-light {
+    background-color: #e9ecef !important;
+    border: 1px dashed #dee2e6;
+}
+
+.badge-sm {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+</style>
+';
+
 include 'templates/header.php';
 ?>
 
@@ -185,39 +243,35 @@ include 'templates/header.php';
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <div>
-                        <h5 class="card-title mb-0"><i class="fas fa-clipboard-list me-2"></i>Process Log</h5>
+                        <h5 class="card-title mb-0"><i class="fas fa-clipboard-list me-2"></i>Process Log Template Preview</h5>
                         <small class="text-muted" id="template-info" style="display: none;">
                             <i class="fas fa-info-circle me-1"></i>
-                            Loaded from template: <span id="template-name"></span>
+                            From template: <span id="template-name"></span>
                         </small>
                     </div>
-                    <button type="button" class="btn btn-sm btn-success" onclick="addProcessLogRow()">
-                        <i class="fas fa-plus me-1"></i>Add Process Log
-                    </button>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="edit-template-btn" onclick="editCurrentTemplate()" style="display: none;">
+                            <i class="fas fa-edit me-1"></i>Edit Template
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-info" onclick="refreshProcessTemplate()">
+                            <i class="fas fa-sync me-1"></i>Refresh
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table id="log-table" class="table table-striped table-hover">                            <thead class="table-dark">
-                                <tr>
-                                    <th width="5%">Seq</th>
-                                    <th width="20%">Step Name</th>
-                                    <th width="12%">Date</th>
-                                    <th width="12%">Result</th>
-                                    <th width="15%">Operator</th>
-                                    <th width="10%">Control</th>
-                                    <th width="10%">Actual</th>
-                                    <th width="11%">Remarks</th>
-                                    <th width="5%">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Default first row -->
-                                <tr>
-                                    <td>
-                                        <input type="number" name="log[0][SequenceNo]" 
-                                               value="1" readonly class="form-control form-control-sm">
-                                    </td>
-                                    <td>
+                    <div id="template-preview-content">
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-arrow-up fa-2x mb-2"></i>
+                            <p>กรุณาเลือก Project และ Model เพื่อแสดง Process Log Template</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden actual process log data for form submission -->
+                    <div id="hidden-process-data" style="display: none;">
+                        <!-- This will contain the actual form inputs -->
+                    </div>
+                </div>
+            </div>
                                         <input type="text" name="log[0][ProcessStepName]" 
                                                class="form-control form-control-sm" placeholder="Enter process step name">
                                     </td>
@@ -250,16 +304,20 @@ include 'templates/header.php';
                                     </td>
                                     <td>
                                         <input type="text" name="log[0][Remarks]" 
-                                               class="form-control form-control-sm">
-                                    </td>
-                                    <td>
-                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProcessLogRow(this)">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                                               class="form-control form-control-sm">                    
+                <div class="card-footer">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> 
+                                Process Log จะถูกสร้างตาม Template ของ Model ที่เลือก
+                            </small>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <small class="text-muted">
+                                ต้องการแก้ไข Process? คลิก "Edit Template" 
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -327,8 +385,7 @@ async function loadProcessTemplate(modelId) {
     try {
         const response = await fetch(`api/get_process_template.php?model_id=${modelId}`);
         const data = await response.json();
-        
-        if (data.error) {
+          if (data.error) {
             console.error('Error loading template:', data.error);
             showToast('Error loading process template', 'warning');
             return;
@@ -339,15 +396,20 @@ async function loadProcessTemplate(modelId) {
             document.getElementById('template-name').textContent = data.template.template_name;
             document.getElementById('template-info').style.display = 'block';
             
+            // Show Edit Template button
+            const editBtn = document.getElementById('edit-template-btn');
+            editBtn.style.display = 'block';
+            editBtn.setAttribute('data-template-id', data.template.template_id);
+            editBtn.setAttribute('data-model-id', modelId);
+            
             // Show notification about template loading
             showToast(`Loading process template: ${data.template.template_name}`, 'info');
             
-            // Clear existing process log rows
-            clearProcessLog();
+            // Display template preview
+            displayTemplatePreview(data.steps, data.template);
             
-            // Add template steps
-            data.steps.forEach((step, index) => {
-                addProcessLogRowFromTemplate(step, index);
+            // Create hidden form inputs for submission
+            createHiddenProcessInputs(data.steps);
             });
         } else {
             // No template available
@@ -698,5 +760,114 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// Template Preview Functions for Phase 1 UX Improvements
+function displayTemplatePreview(steps, template) {
+    const previewContent = document.getElementById('template-preview-content');
+    
+    let previewHTML = `
+        <div class="template-preview">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Process Steps Preview</h6>
+                    <small class="text-muted">จาก Template: ${template.template_name}</small>
+                </div>
+                <span class="badge bg-info">${steps.length} Steps</span>
+            </div>
+            <div class="process-steps-preview">
+    `;
+    
+    steps.forEach((step, index) => {
+        const isRequired = step.IsRequired ? '<span class="badge badge-sm bg-warning ms-2">Required</span>' : '';
+        const defaultValue = step.DefaultValue ? `<small class="text-muted">Default: ${step.DefaultValue}</small>` : '';
+        
+        previewHTML += `
+            <div class="process-step-item mb-2 p-3 border rounded">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center">
+                            <span class="step-number me-3 badge bg-primary">${step.StepOrder}</span>
+                            <strong>${step.StepName}</strong>
+                            ${isRequired}
+                        </div>
+                        ${defaultValue ? `<div class="mt-1">${defaultValue}</div>` : ''}
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted">Ready to use</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    previewHTML += `
+            </div>
+            <div class="mt-3 p-3 bg-light rounded">
+                <div class="row">
+                    <div class="col-md-8">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Process steps นี้จะถูกสร้างขึ้นใน Production Order อัตโนมัติ
+                        </small>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <small class="text-muted">
+                            <i class="fas fa-edit me-1"></i>
+                            ต้องการแก้ไข? คลิก "Edit Template"
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    previewContent.innerHTML = previewHTML;
+}
+
+function createHiddenProcessInputs(steps) {
+    const hiddenContainer = document.getElementById('hidden-process-data');
+    let hiddenHTML = '';
+    
+    steps.forEach((step, index) => {
+        hiddenHTML += `
+            <input type="hidden" name="log[${index}][SequenceNo]" value="${step.StepOrder}">
+            <input type="hidden" name="log[${index}][ProcessStepName]" value="${step.StepName}">
+            <input type="hidden" name="log[${index}][DatePerformed]" value="">
+            <input type="hidden" name="log[${index}][Result]" value="">
+            <input type="hidden" name="log[${index}][Operator_UserID]" value="">
+            <input type="hidden" name="log[${index}][Remarks]" value="">
+            <input type="hidden" name="log[${index}][ControlValue]" value="${step.DefaultValue || ''}">
+            <input type="hidden" name="log[${index}][ActualMeasuredValue]" value="">
+        `;
+    });
+    
+    hiddenContainer.innerHTML = hiddenHTML;
+}
+
+function editCurrentTemplate() {
+    const editBtn = document.getElementById('edit-template-btn');
+    const templateId = editBtn.getAttribute('data-template-id');
+    const modelId = editBtn.getAttribute('data-model-id');
+    
+    if (templateId && modelId) {
+        // Open template builder in new tab/window
+        const url = `process_template_builder.php?template_id=${templateId}&model_id=${modelId}&return_to=create_order`;
+        window.open(url, '_blank');
+    } else {
+        showToast('Template information not available', 'error');
+    }
+}
+
+function refreshProcessTemplate() {
+    const modelSelect = document.getElementById('model');
+    const selectedModelId = modelSelect.value;
+    
+    if (selectedModelId) {
+        loadProcessTemplate(selectedModelId);
+        showToast('Refreshing process template...', 'info');
+    } else {
+        showToast('Please select a model first', 'warning');
+    }
+}
 </script>
 <?php include 'templates/footer.php'; ?>
