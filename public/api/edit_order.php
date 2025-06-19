@@ -17,15 +17,27 @@ if (!isset($_SESSION['UserID'])) {
 require_once __DIR__ . '/../../src/Database.php';
 $pdo = Database::connect();
 
-$productionNumber = Database::sanitizeString($_POST['ProductionNumber'] ?? '');
+$productionNumber = Database::sanitizeString($_POST['ProductionNumber'] ?? $_GET['pn'] ?? '');
 $emptyTube = Database::sanitizeString($_POST['EmptyTubeNumber'] ?? '');
 $projectID = $_POST['ProjectID'] !== '' ? (int)$_POST['ProjectID'] : null;
 $modelID = $_POST['ModelID'] !== '' ? (int)$_POST['ModelID'] : null;
 $status = Database::sanitizeString($_POST['MC02_Status'] ?? '');
 
+// Debug: Log received parameters (for development only)
+error_log("Edit Order API - ProductionNumber: " . $productionNumber . 
+          ", POST: " . ($_POST['ProductionNumber'] ?? 'not set') . 
+          ", GET: " . ($_GET['pn'] ?? 'not set'));
+
 if (!$productionNumber) {
     http_response_code(422);
-    echo json_encode(['error' => 'Invalid production number']);
+    echo json_encode([
+        'error' => 'กรุณาใส่ Production Number (Invalid production number)',
+        'debug' => [
+            'post_pn' => $_POST['ProductionNumber'] ?? null,
+            'get_pn' => $_GET['pn'] ?? null,
+            'received_pn' => $productionNumber
+        ]
+    ]);
     exit;
 }
 

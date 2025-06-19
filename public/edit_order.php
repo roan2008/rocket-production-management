@@ -137,6 +137,9 @@ include __DIR__ . '/templates/header.php';
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
         <?php endif; ?>        <form method="post" id="edit-order-form">
+            <!-- Hidden field สำหรับ Production Number -->
+            <input type="hidden" name="ProductionNumber" value="<?php echo htmlspecialchars($order['ProductionNumber']); ?>">
+            
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="card-title mb-0">Basic Information</h5>
@@ -347,9 +350,8 @@ include __DIR__ . '/templates/header.php';
                 if (!modelId) {
                     showToast('Please select a Model', 'error');
                     return;
-                }
-                showLoading();
-                fetch('api/edit_order.php', {
+                }                showLoading();
+                fetch('api/edit_order.php?pn=<?php echo urlencode($pn); ?>', {
                     method: 'POST',
                     body: new FormData(form)
                 })

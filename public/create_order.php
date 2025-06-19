@@ -13,15 +13,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $productionNumber = Database::sanitizeString($_POST['ProductionNumber'] ?? '');
 $emptyTube = Database::sanitizeString($_POST['EmptyTubeNumber'] ?? '');
 $projectID = $_POST['ProjectID'] !== '' ? (int)$_POST['ProjectID'] : null;
-$modelID = $_POST['ModelID'] !== '' ? (int)$_POST['ModelID'] : null;
-
-    if (!$productionNumber) {
-        $error = 'Production Number is required';
+$modelID = $_POST['ModelID'] !== '' ? (int)$_POST['ModelID'] : null;    if (!$productionNumber) {
+        $error = 'กรุณาใส่ Production Number (Production Number is required)';
     } else {
         $stmt = $pdo->prepare('SELECT COUNT(*) FROM ProductionOrders WHERE ProductionNumber = ?');
         $stmt->execute([$productionNumber]);
         if ($stmt->fetchColumn() > 0) {
-            $error = 'Production Number already exists';
+            $error = 'Production Number "' . $productionNumber . '" มีอยู่แล้ว กรุณาใช้หมายเลขอื่น (Production Number already exists, please use a different number)';
         }
     }
 
@@ -99,11 +97,24 @@ include 'templates/header.php';
                     <h5 class="card-title mb-0"><i class="fas fa-info-circle me-2"></i>Basic Information</h5>
                 </div>
                 <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label class="form-label"><strong>Production Number</strong> <span class="text-danger">*</span></label>
-                                <input type="text" name="ProductionNumber" class="form-control" required>
+                    <div class="row">                        <div class="col-md-6">                            <div class="mb-3">
+                                <label class="form-label">
+                                    <strong>Production Number</strong> <span class="text-danger">*</span>
+                                    <a href="production_number_help.php" target="_blank" class="text-info ms-2" title="ดูคู่มือการใช้ Production Number">
+                                        <i class="fas fa-question-circle"></i>
+                                    </a>
+                                </label>
+                                <input type="text" name="ProductionNumber" id="productionNumber" class="form-control" required 
+                                       placeholder="e.g., PO-2025-001, TOP-001, M2C-001">
+                                <div id="productionNumberFeedback" class="mt-1"></div>
+                                <small class="text-muted">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Production Number ต้องไม่ซ้ำกับที่เคยสร้างแล้ว คุณสามารถใช้รูปแบบใดก็ได้ เช่น PO-2025-001, TOP-001, M2C-001 เป็นต้น
+                                </small>
+                                <div id="productionNumberSuggestions" class="mt-2" style="display: none;">
+                                    <small class="text-muted">คำแนะนำ Production Number:</small>
+                                    <div id="suggestionList" class="mt-1"></div>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -125,10 +136,9 @@ include 'templates/header.php';
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
+                        <div class="col-md-6">                            <div class="mb-3">
                                 <label class="form-label"><strong>Model</strong> <span class="text-danger">*</span></label>
-                                <select name="ModelID" id="model" class="form-select" required>
+                                <select name="ModelID" id="model" class="form-select" required onchange="loadProcessTemplate(this.value)">
                                     <option value="">--Select Project First--</option>
                                 </select>
                             </div>
@@ -174,7 +184,13 @@ include 'templates/header.php';
             </div>            <!-- Process Log Card -->
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0"><i class="fas fa-clipboard-list me-2"></i>Process Log</h5>
+                    <div>
+                        <h5 class="card-title mb-0"><i class="fas fa-clipboard-list me-2"></i>Process Log</h5>
+                        <small class="text-muted" id="template-info" style="display: none;">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Loaded from template: <span id="template-name"></span>
+                        </small>
+                    </div>
                     <button type="button" class="btn btn-sm btn-success" onclick="addProcessLogRow()">
                         <i class="fas fa-plus me-1"></i>Add Process Log
                     </button>
@@ -289,6 +305,151 @@ function loadModels(projectId) {
             console.error('Error loading models:', error);
             modelSelect.innerHTML = '<option value="">Error loading models</option>';
         });
+}
+
+async function loadProcessTemplate(modelId) {
+    if (!modelId) {
+        // Hide template info
+        document.getElementById('template-info').style.display = 'none';
+        return;
+    }
+    
+    // Check if there are existing process log entries
+    const existingRows = document.querySelectorAll('#log-table tbody tr').length;
+    if (existingRows > 1) { // More than just the default empty row
+        if (!confirm('Changing the model will replace current process log entries with the template. Continue?')) {
+            // Reset model selection
+            document.getElementById('model').value = '';
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch(`api/get_process_template.php?model_id=${modelId}`);
+        const data = await response.json();
+        
+        if (data.error) {
+            console.error('Error loading template:', data.error);
+            showToast('Error loading process template', 'warning');
+            return;
+        }
+        
+        if (data.template && data.steps.length > 0) {
+            // Show template info
+            document.getElementById('template-name').textContent = data.template.template_name;
+            document.getElementById('template-info').style.display = 'block';
+            
+            // Show notification about template loading
+            showToast(`Loading process template: ${data.template.template_name}`, 'info');
+            
+            // Clear existing process log rows
+            clearProcessLog();
+            
+            // Add template steps
+            data.steps.forEach((step, index) => {
+                addProcessLogRowFromTemplate(step, index);
+            });
+        } else {
+            // No template available
+            document.getElementById('template-info').style.display = 'none';
+            showToast('No process template available for this model', 'warning');
+        }
+    } catch (error) {
+        console.error('Error loading process template:', error);
+        showToast('Failed to load process template', 'danger');
+    }
+}
+
+function clearProcessLog() {
+    const tbody = document.querySelector('#log-table tbody');
+    tbody.innerHTML = '';
+    processLogRowCount = 0;
+}
+
+function addProcessLogRowFromTemplate(step, index) {
+    const table = document.getElementById('log-table').getElementsByTagName('tbody')[0];
+    const row = table.insertRow();
+    const isRequired = step.IsRequired == 1;
+    
+    row.innerHTML = `
+        <td>
+            <input type="number" name="log[${index}][SequenceNo]" 
+                   value="${step.StepOrder}" readonly class="form-control form-control-sm">
+        </td>
+        <td>
+            <input type="text" name="log[${index}][ProcessStepName]" 
+                   value="${htmlspecialchars(step.StepName)}" 
+                   class="form-control form-control-sm ${isRequired ? 'border-warning' : ''}" 
+                   ${isRequired ? 'required' : ''}>
+            ${isRequired ? '<small class="text-warning">Required</small>' : ''}
+        </td>
+        <td>
+            <input type="date" name="log[${index}][DatePerformed]" 
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <select name="log[${index}][Result]" class="form-select form-select-sm ${isRequired ? 'border-warning' : ''}">
+                <option value="">--</option>
+                <option value="✓ เรียบร้อย">✓ เรียบร้อย</option>
+                <option value="✗ แก้ไข">✗ แก้ไข</option>
+            </select>
+        </td>
+        <td>
+            <select name="log[${index}][Operator_UserID]" class="form-select form-select-sm">
+                <option value="">--</option>
+                <?php foreach ($users as $u): ?>
+                <option value="<?php echo $u['UserID']; ?>"><?php echo htmlspecialchars($u['FullName']); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </td>
+        <td>
+            <input type="number" step="0.001" name="log[${index}][ControlValue]" 
+                   value="${step.DefaultValue || ''}"
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <input type="number" step="0.001" name="log[${index}][ActualMeasuredValue]" 
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <input type="text" name="log[${index}][Remarks]" 
+                   class="form-control form-control-sm">
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeProcessLogRow(this)">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    processLogRowCount = Math.max(processLogRowCount, index + 1);
+}
+
+function htmlspecialchars(str) {
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
+}
+
+function showToast(message, type = 'success') {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 3000);
 }
 
 function addLinerRow() {
@@ -418,6 +579,79 @@ function removeProcessLogRow(button) {
         alert('You must have at least one process log row.');
     }
 }
+
+// Production Number Validation
+    let validationTimeout;
+    const productionNumberInput = document.getElementById('productionNumber');
+    const feedbackDiv = document.getElementById('productionNumberFeedback');
+    const suggestionsDiv = document.getElementById('productionNumberSuggestions');
+    const suggestionList = document.getElementById('suggestionList');
+
+    // Load initial suggestions
+    loadSuggestions();
+
+    productionNumberInput.addEventListener('input', function() {
+        clearTimeout(validationTimeout);
+        const value = this.value.trim();
+        
+        if (value.length === 0) {
+            feedbackDiv.innerHTML = '';
+            suggestionsDiv.style.display = 'block';
+            return;
+        }
+
+        feedbackDiv.innerHTML = '<small class="text-info"><i class="fas fa-spinner fa-spin"></i> Checking availability...</small>';
+        
+        validationTimeout = setTimeout(() => {
+            checkProductionNumber(value);
+        }, 500);
+    });
+
+    async function checkProductionNumber(productionNumber) {
+        try {
+            const response = await fetch(`api/production_number_helper.php?action=check&production_number=${encodeURIComponent(productionNumber)}`);
+            const data = await response.json();
+            
+            if (data.available) {
+                feedbackDiv.innerHTML = '<small class="text-success"><i class="fas fa-check"></i> Production number is available</small>';
+                suggestionsDiv.style.display = 'none';
+            } else {
+                feedbackDiv.innerHTML = `<small class="text-danger"><i class="fas fa-times"></i> ${data.message}</small>`;
+                if (data.suggestions && data.suggestions.length > 0) {
+                    showSuggestions(data.suggestions);
+                    suggestionsDiv.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            feedbackDiv.innerHTML = '<small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Unable to check availability</small>';
+        }
+    }
+
+    async function loadSuggestions() {
+        try {
+            const response = await fetch('api/production_number_helper.php?action=suggest');
+            const data = await response.json();
+            
+            if (data.suggestions && data.suggestions.length > 0) {
+                showSuggestions(data.suggestions);
+                suggestionsDiv.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Unable to load suggestions:', error);
+        }
+    }
+
+    function showSuggestions(suggestions) {
+        suggestionList.innerHTML = suggestions.map(suggestion => 
+            `<button type="button" class="btn btn-outline-secondary btn-sm me-1 mb-1" onclick="selectSuggestion('${suggestion}')">${suggestion}</button>`
+        ).join('');
+    }
+
+    function selectSuggestion(suggestion) {
+        productionNumberInput.value = suggestion;
+        productionNumberInput.focus();
+        checkProductionNumber(suggestion);
+    }
 
 // Form validation
 document.addEventListener('DOMContentLoaded', function() {

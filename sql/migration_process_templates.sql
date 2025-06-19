@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS ProcessTemplates (
     Description TEXT,
     IsActive BOOLEAN DEFAULT TRUE,
     CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ModelID) REFERENCES Models(ModelID)
+    FOREIGN KEY (ModelID) REFERENCES Models(ModelID) ON DELETE CASCADE
 );
 
 -- Template steps for a given template
@@ -19,10 +19,5 @@ CREATE TABLE IF NOT EXISTS TemplateSteps (
     StepName VARCHAR(100) NOT NULL,
     DefaultValue VARCHAR(255),
     IsRequired BOOLEAN DEFAULT FALSE,
-    FOREIGN KEY (TemplateID) REFERENCES ProcessTemplates(TemplateID)
+    FOREIGN KEY (TemplateID) REFERENCES ProcessTemplates(TemplateID) ON DELETE CASCADE
 );
-
--- Link Models to a default template (optional)
-ALTER TABLE Models ADD COLUMN DefaultTemplateID INT NULL;
-ALTER TABLE Models ADD CONSTRAINT FK_Models_DefaultTemplate
-    FOREIGN KEY (DefaultTemplateID) REFERENCES ProcessTemplates(TemplateID);

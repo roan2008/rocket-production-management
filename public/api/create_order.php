@@ -25,12 +25,12 @@ $modelID = $_POST['ModelID'] ?? null;
 $error = '';
 
 if (!$productionNumber) {
-    $error = 'Production Number is required';
+    $error = 'กรุณาใส่ Production Number (Production Number is required)';
 } else {
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM ProductionOrders WHERE ProductionNumber = ?');
     $stmt->execute([$productionNumber]);
     if ($stmt->fetchColumn() > 0) {
-        $error = 'Production Number already exists';
+        $error = 'Production Number "' . $productionNumber . '" มีอยู่แล้ว กรุณาใช้หมายเลขอื่น (Production Number already exists, please use a different number)';
     }
 }
 
