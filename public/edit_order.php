@@ -9,6 +9,24 @@ require_once __DIR__ . '/../src/Database.php';
 $pdo = Database::connect();
 $pn = Database::sanitizeString($_GET['pn'] ?? '');
 
+// Helper functions for Phase 1 UX improvements
+function getProcessStepStatus($result) {
+    if (empty($result)) return 'pending';
+    $result = strtolower(trim($result));
+    if (in_array($result, ['complete', 'completed', 'pass', 'ok', 'good'])) return 'completed';
+    if (in_array($result, ['in progress', 'working', 'started'])) return 'in-progress';
+    return 'pending';
+}
+
+function getStatusBadgeClass($result) {
+    if (empty($result)) return 'bg-secondary';
+    $result = strtolower(trim($result));
+    if (in_array($result, ['complete', 'completed', 'pass', 'ok', 'good'])) return 'bg-success';
+    if (in_array($result, ['in progress', 'working', 'started'])) return 'bg-warning text-dark';
+    if (in_array($result, ['fail', 'failed', 'error', 'reject'])) return 'bg-danger';
+    return 'bg-secondary';
+}
+
 // Fetch existing order data
 $stmt = $pdo->prepare('SELECT po.*, p.ProjectName, m.ModelName
                        FROM ProductionOrders po
@@ -117,7 +135,75 @@ $breadcrumbs = [
     ['title' => $order['ProductionNumber'], 'url' => 'view_order.php?pn=' . urlencode($order['ProductionNumber'])],
     ['title' => 'Edit']
 ];
+
+// Phase 1 UX Improvements - Custom CSS for Edit Order
+$custom_css = '
+<style>
+.process-log-readonly {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid #dee2e6;
+}
+
+.process-step-row {
+    background: white;
+    border: 1px solid #e3e6f0;
+    border-radius: 5px;
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+}
+
+.process-step-row:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.process-step-row.completed {
+    border-left: 4px solid #28a745;
+    background: linear-gradient(90deg, #d4edda 0%, white 20%);
+}
+
+.process-step-row.in-progress {
+    border-left: 4px solid #ffc107;
+    background: linear-gradient(90deg, #fff3cd 0%, white 20%);
+}
+
+.process-step-row.pending {
+    border-left: 4px solid #6c757d;
+    background: linear-gradient(90deg, #f8f9fa 0%, white 20%);
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.edit-mode-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+#insert-process-btn {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    60% { transform: translateY(-5px); }
+}
+</style>
+';
+
 include __DIR__ . '/templates/header.php';
+echo $custom_css;
 ?>
 
 <div class="row">
@@ -234,61 +320,105 @@ include __DIR__ . '/templates/header.php';
                             </tbody>
                         </table>
                     </div>
-                </div>            </div>
-
+                </div>            </div>            <!-- Process Log Section - Phase 1 UX Enhancement -->
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Process Log</h5>
-                    <button type="button" onclick="addLogRow()" class="btn btn-primary btn-sm">Add Process Log Row</button>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-sm" id="logTable">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Seq</th>
-                                    <th>Process Step</th>
-                                    <th>Date</th>
-                                    <th>Result</th>
-                                    <th>Operator ID</th>
-                                    <th>Control Value</th>
-                                    <th>Actual Value</th>
-                                    <th>Remarks</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (!empty($logs)): ?>
-                                    <?php foreach ($logs as $index => $log): ?>
-                                        <tr>
-                                            <td><input type="number" class="form-control form-control-sm" name="log[<?php echo $index; ?>][SequenceNo]" value="<?php echo $log['SequenceNo']; ?>" style="width: 70px;"></td>
-                                            <td><input type="text" class="form-control form-control-sm" name="log[<?php echo $index; ?>][ProcessStepName]" value="<?php echo htmlspecialchars($log['ProcessStepName']); ?>"></td>
-                                            <td><input type="date" class="form-control form-control-sm" name="log[<?php echo $index; ?>][DatePerformed]" value="<?php echo $log['DatePerformed']; ?>"></td>
-                                            <td><input type="text" class="form-control form-control-sm" name="log[<?php echo $index; ?>][Result]" value="<?php echo htmlspecialchars($log['Result']); ?>"></td>
-                                            <td><input type="number" class="form-control form-control-sm" name="log[<?php echo $index; ?>][Operator_UserID]" value="<?php echo $log['Operator_UserID']; ?>" style="width: 90px;"></td>
-                                            <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[<?php echo $index; ?>][ControlValue]" value="<?php echo $log['ControlValue']; ?>" style="width: 100px;"></td>
-                                            <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[<?php echo $index; ?>][ActualMeasuredValue]" value="<?php echo $log['ActualMeasuredValue']; ?>" style="width: 100px;"></td>
-                                            <td><textarea class="form-control form-control-sm" name="log[<?php echo $index; ?>][Remarks]" rows="2"><?php echo htmlspecialchars($log['Remarks']); ?></textarea></td>
-                                            <td><button type="button" onclick="removeRow(this)" class="btn btn-outline-danger btn-sm">Remove</button></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <tr>
-                                        <td><input type="number" class="form-control form-control-sm" name="log[0][SequenceNo]" value="1" style="width: 70px;"></td>
-                                        <td><input type="text" class="form-control form-control-sm" name="log[0][ProcessStepName]"></td>
-                                        <td><input type="date" class="form-control form-control-sm" name="log[0][DatePerformed]"></td>
-                                        <td><input type="text" class="form-control form-control-sm" name="log[0][Result]"></td>
-                                        <td><input type="number" class="form-control form-control-sm" name="log[0][Operator_UserID]" style="width: 90px;"></td>
-                                        <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[0][ControlValue]" style="width: 100px;"></td>
-                                        <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[0][ActualMeasuredValue]" style="width: 100px;"></td>
-                                        <td><textarea class="form-control form-control-sm" name="log[0][Remarks]" rows="2"></textarea></td>
-                                        <td><button type="button" onclick="removeRow(this)" class="btn btn-outline-danger btn-sm">Remove</button></td>
-                                    </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                    <div>
+                        <h5 class="card-title mb-0"><i class="fas fa-clipboard-list me-2"></i>Process Log Management</h5>
+                        <small class="text-muted">Current order process steps and status</small>
+                    </div>
+                    <div class="btn-group">
+                        <button type="button" id="insert-process-btn" class="btn btn-warning btn-sm" onclick="showInsertProcessModal()">
+                            <i class="fas fa-plus-circle me-1"></i>Insert Missing Process
+                        </button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="editProcessTemplate()">
+                            <i class="fas fa-edit me-1"></i>Edit Template
+                        </button>
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="refreshProcessSteps()">
+                            <i class="fas fa-sync me-1"></i>Refresh
+                        </button>
                     </div>
                 </div>
+                <div class="card-body">
+                    <div class="edit-mode-info">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h6 class="mb-1"><i class="fas fa-tools me-2"></i>Edit Mode: Production Order Process</h6>
+                                <p class="mb-0">ในหน้านี้คุณสามารถแก้ไขสถานะและรายละเอียดของแต่ละ Process Step ได้ หากต้องการเพิ่ม/ลบ Process ให้ใช้ปุ่ม "Insert Missing Process" หรือ "Edit Template"</p>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="badge bg-light text-dark fs-6">Order: <?php echo htmlspecialchars($order['ProductionNumber']); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="process-log-container">
+                        <?php if (empty($logs)): ?>
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-clipboard fa-3x mb-3"></i>
+                                <h5>No Process Steps Found</h5>
+                                <p>This order doesn't have any process steps yet.</p>
+                                <button type="button" class="btn btn-primary" onclick="loadProcessFromTemplate()">
+                                    <i class="fas fa-download me-2"></i>Load from Template
+                                </button>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach ($logs as $index => $log): ?>
+                                <div class="process-step-row <?php echo getProcessStepStatus($log['Result']); ?>" data-step-id="<?php echo $log['SequenceNo']; ?>">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-1">
+                                            <div class="step-number bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 35px; height: 35px; font-weight: bold;">
+                                                <?php echo $log['SequenceNo']; ?>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <strong><?php echo htmlspecialchars($log['ProcessStepName']); ?></strong>
+                                            <?php if ($log['DatePerformed']): ?>
+                                                <br><small class="text-muted"><?php echo date('M j, Y', strtotime($log['DatePerformed'])); ?></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <span class="status-badge <?php echo getStatusBadgeClass($log['Result']); ?>">
+                                                <?php echo $log['Result'] ?: 'Pending'; ?>
+                                            </span>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <?php if ($log['Operator_UserID']): ?>
+                                                <small>Operator: <?php echo $log['Operator_UserID']; ?></small>
+                                            <?php endif; ?>
+                                            <?php if ($log['ControlValue'] || $log['ActualMeasuredValue']): ?>
+                                                <br><small>Control: <?php echo $log['ControlValue']; ?> | Actual: <?php echo $log['ActualMeasuredValue']; ?></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <?php if ($log['Remarks']): ?>
+                                                <small class="text-muted"><?php echo htmlspecialchars($log['Remarks']); ?></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="col-md-1 text-end">
+                                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="editProcessStep(<?php echo $log['SequenceNo']; ?>)">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Hidden inputs for form submission -->
+                    <div id="hidden-process-data" style="display: none;">
+                        <?php foreach ($logs as $index => $log): ?>
+                            <input type="hidden" name="log[<?php echo $index; ?>][SequenceNo]" value="<?php echo $log['SequenceNo']; ?>">
+                            <input type="hidden" name="log[<?php echo $index; ?>][ProcessStepName]" value="<?php echo htmlspecialchars($log['ProcessStepName']); ?>">
+                            <input type="hidden" name="log[<?php echo $index; ?>][DatePerformed]" value="<?php echo $log['DatePerformed']; ?>">
+                            <input type="hidden" name="log[<?php echo $index; ?>][Result]" value="<?php echo htmlspecialchars($log['Result']); ?>">
+                            <input type="hidden" name="log[<?php echo $index; ?>][Operator_UserID]" value="<?php echo $log['Operator_UserID']; ?>">
+                            <input type="hidden" name="log[<?php echo $index; ?>][Remarks]" value="<?php echo htmlspecialchars($log['Remarks']); ?>">
+                            <input type="hidden" name="log[<?php echo $index; ?>][ControlValue]" value="<?php echo $log['ControlValue']; ?>">
+                            <input type="hidden" name="log[<?php echo $index; ?>][ActualMeasuredValue]" value="<?php echo $log['ActualMeasuredValue']; ?>">
+                        <?php endforeach; ?>
+                    </div>                </div>
             </div>
 
             <div class="d-flex gap-2 mb-4">
@@ -297,11 +427,10 @@ include __DIR__ . '/templates/header.php';
             </div>
         </form>
     </div>
-</div>
-
-    <script>
+</div>    <script>
         let linerRowCount = <?php echo max(1, count($liners)); ?>;
-        let logRowCount = <?php echo max(1, count($logs)); ?>;        function addLinerRow() {
+
+        function addLinerRow() {
             const table = document.getElementById('linerTable').getElementsByTagName('tbody')[0];
             const newRow = table.insertRow();
             newRow.innerHTML = `
@@ -313,26 +442,70 @@ include __DIR__ . '/templates/header.php';
             linerRowCount++;
         }
 
-        function addLogRow() {
-            const table = document.getElementById('logTable').getElementsByTagName('tbody')[0];
-            const newRow = table.insertRow();
-            newRow.innerHTML = `
-                <td><input type="number" class="form-control form-control-sm" name="log[${logRowCount}][SequenceNo]" value="${logRowCount + 1}" style="width: 70px;"></td>
-                <td><input type="text" class="form-control form-control-sm" name="log[${logRowCount}][ProcessStepName]"></td>
-                <td><input type="date" class="form-control form-control-sm" name="log[${logRowCount}][DatePerformed]"></td>
-                <td><input type="text" class="form-control form-control-sm" name="log[${logRowCount}][Result]"></td>
-                <td><input type="number" class="form-control form-control-sm" name="log[${logRowCount}][Operator_UserID]" style="width: 90px;"></td>
-                <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[${logRowCount}][ControlValue]" style="width: 100px;"></td>
-                <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[${logRowCount}][ActualMeasuredValue]" style="width: 100px;"></td>
-                <td><textarea class="form-control form-control-sm" name="log[${logRowCount}][Remarks]" rows="2"></textarea></td>
-                <td><button type="button" onclick="removeRow(this)" class="btn btn-outline-danger btn-sm">Remove</button></td>
-            `;
-            logRowCount++;
-        }
-
         function removeRow(button) {
             const row = button.closest('tr');
             row.remove();
+        }
+
+        // Phase 1 UX Improvement Functions
+        function showInsertProcessModal() {
+            showToast('Feature coming in Phase 2: Drag & Drop Process Insertion', 'info');
+        }
+
+        function editProcessTemplate() {
+            const modelId = document.querySelector('[name="ModelID"]').value;
+            if (!modelId) {
+                showToast('Please select a Model first to edit its process template', 'warning');
+                return;
+            }
+            window.open(`process_template_builder.php?model_id=${modelId}`, '_blank');
+        }
+
+        function refreshProcessSteps() {
+            showLoading();
+            fetch(`api/get_process_steps.php?pn=<?php echo urlencode($pn); ?>`)
+                .then(r => r.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.success) {
+                        location.reload(); // Refresh page to show updated steps
+                    } else {
+                        showToast(data.error || 'Failed to refresh process steps', 'error');
+                    }
+                })
+                .catch(() => {
+                    hideLoading();
+                    showToast('Network error while refreshing', 'error');
+                });
+        }
+
+        function editProcessStep(stepId) {
+            showToast('Feature coming in Phase 2: Individual Process Step Editing', 'info');
+        }
+
+        function loadProcessFromTemplate() {
+            const modelId = document.querySelector('[name="ModelID"]').value;
+            if (!modelId) {
+                showToast('Please select a Model first', 'warning');
+                return;
+            }
+            
+            showLoading();
+            fetch(`api/load_process_template.php?model_id=${modelId}&pn=<?php echo urlencode($pn); ?>`)
+                .then(r => r.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.success) {
+                        showToast('Process steps loaded from template');
+                        location.reload();
+                    } else {
+                        showToast(data.error || 'Failed to load template', 'error');
+                    }
+                })
+                .catch(() => {
+                    hideLoading();
+                    showToast('Network error', 'error');
+                });
         }
 
         document.addEventListener('DOMContentLoaded', function () {
@@ -350,7 +523,9 @@ include __DIR__ . '/templates/header.php';
                 if (!modelId) {
                     showToast('Please select a Model', 'error');
                     return;
-                }                showLoading();
+                }
+
+                showLoading();
                 fetch('api/edit_order.php?pn=<?php echo urlencode($pn); ?>', {
                     method: 'POST',
                     body: new FormData(form)
@@ -360,7 +535,7 @@ include __DIR__ . '/templates/header.php';
                         hideLoading();
                         if (data.success) {
                             showToast('Order updated successfully');
-                            refreshLogs(data.logs);
+                            setTimeout(() => location.reload(), 1000);
                         } else {
                             showToast(data.error || 'Update failed', 'error');
                         }
@@ -371,26 +546,7 @@ include __DIR__ . '/templates/header.php';
                     });
             });
         });
-
-        function refreshLogs(logs) {
-            const tbody = document.getElementById('logTable').getElementsByTagName('tbody')[0];
-            tbody.innerHTML = '';
-            logRowCount = logs.length;
-            logs.forEach((log, index) => {
-                const row = tbody.insertRow();
-                row.innerHTML = `
-                    <td><input type="number" class="form-control form-control-sm" name="log[${index}][SequenceNo]" value="${log.SequenceNo}" style="width: 70px;"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="log[${index}][ProcessStepName]" value="${log.ProcessStepName}"></td>
-                    <td><input type="date" class="form-control form-control-sm" name="log[${index}][DatePerformed]" value="${log.DatePerformed ?? ''}"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="log[${index}][Result]" value="${log.Result ?? ''}"></td>
-                    <td><input type="number" class="form-control form-control-sm" name="log[${index}][Operator_UserID]" value="${log.Operator_UserID ?? ''}" style="width: 90px;"></td>
-                    <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[${index}][ControlValue]" value="${log.ControlValue ?? ''}" style="width: 100px;"></td>
-                    <td><input type="number" step="0.001" class="form-control form-control-sm" name="log[${index}][ActualMeasuredValue]" value="${log.ActualMeasuredValue ?? ''}" style="width: 100px;"></td>
-                    <td><textarea class="form-control form-control-sm" name="log[${index}][Remarks]" rows="2">${log.Remarks ?? ''}</textarea></td>
-                    <td><button type="button" onclick="removeRow(this)" class="btn btn-outline-danger btn-sm">Remove</button></td>
-                `;
-            });
-        }
+    </script>
     </script>
 
 <?php include __DIR__ . '/templates/footer.php'; ?>
